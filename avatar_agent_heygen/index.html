@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Avatar Agent</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    video {
+      width: 420px;
+      height: 420px;
+      background: black;
+      border-radius: 14px;
+    }
+    button {
+      margin-top: 12px;
+      padding: 10px 18px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      max-height: 220px;
+      overflow: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Avatar Agent</h2>
+
+  <video id="avatarVideo" autoplay playsinline></video><br />
+  <button id="micBtn">🎙 Start Talking</button>
+
+  <pre id="log"></pre>
+
+  <script>
+    /***********************
+     * CONFIG
+     ***********************/
+    const HEYGEN_API_KEY = "sk_V2_hgu_kSWy8lZXUd3_JfH0mPUgfXQ4pXiCGag3ntiXVB7y7VaN";
+
+    const logEl = document.getElementById("log");
+    const log = (msg) => {
+      logEl.textContent += msg + "\n";
+      console.log(msg);
+    };
+
+    /***********************
+     * WEBSOCKET SETUP
+     ***********************/
+    const sessionId = crypto.randomUUID();
+    log("Session ID: " + sessionId);
+
+    const ws = new WebSocket(
+      `ws://localhost:8000/ws/conversation/${sessionId}`
+    );
+
+    ws.onopen = () => log("✅ WebSocket connected");
+    ws.onerror = (e) => log("❌ WebSocket error");
+    ws.onclose = () => log("🔌 WebSocket closed");
+
+    /***********************
+     * HEYGEN WEBRTC
+     ***********************/
+    let peerConnection = null;
+
+    async function startHeyGenStream(details) {
+      log("🎭 Starting HeyGen WebRTC stream...");
+
+      peerConnection = new RTCPeerConnection({
+        iceServers: details.ice_servers
+      });
+
+      peerConnection.ontrack = (event) => {
+        log("🎥 Avatar video stream received");
+        document.getElementById("avatarVideo").srcObject = event.streams[0];
+      };
+
+      await peerConnection.setRemoteDescription({
+        type: "offer",
+        sdp: details.sdp
+      });
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+
+      // Send SDP answer back to HeyGen
+      await fetch("https://api.heygen.com/v1/streaming.answer", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${HEYGEN_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          session_id: details.session_id,
+          sdp: answer.sdp
+        })
+      });
+
+      log("✅ HeyGen avatar connected");
+    }
+
+    ws.onmessage = async (event) => {
+      const msg = JSON.parse(event.data);
+
+      if (msg.type === "heygen_session") {
+        await startHeyGenStream(msg.data);
+      }
+    };
+
+    /***********************
+     * MICROPHONE STREAMING
+     ***********************/
+    let audioContext;
+    let processor;
+
+    document.getElementById("micBtn").onclick = async () => {
+      log("🎙 Starting microphone...");
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      audioContext = new AudioContext({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      processor.onaudioprocess = (e) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+
+        const input = e.inputBuffer.getChannelData(0);
+        const pcm16 = new Int16Array(input.length);
+
+        for (let i = 0; i < input.length; i++) {
+          pcm16[i] = Math.max(-1, Math.min(1, input[i])) * 0x7fff;
+        }
+
+        ws.send(pcm16.buffer);
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      log("🎙 Mic streaming started");
+    };
+  </script>
+</body>
+</html>
