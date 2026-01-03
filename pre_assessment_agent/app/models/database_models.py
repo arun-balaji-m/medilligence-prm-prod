@@ -1,7 +1,3 @@
-"""
-SQLAlchemy database models
-"""
-
 from sqlalchemy import Column, BigInteger, String, Date, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime

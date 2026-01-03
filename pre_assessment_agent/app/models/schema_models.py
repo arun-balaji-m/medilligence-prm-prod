@@ -1,13 +1,8 @@
-"""
-Pydantic models for request/response validation
-"""
-
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime, date
 
 
-# Request/Response Models
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -32,7 +27,6 @@ class VoiceAssessmentRequest(BaseModel):
     session_data: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
-# Database Response Models
 class PatientResponse(BaseModel):
     id: int
     patient_mrn: Optional[str]

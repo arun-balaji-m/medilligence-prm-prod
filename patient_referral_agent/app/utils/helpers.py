@@ -3,14 +3,11 @@ from typing import Optional
 
 
 def parse_flexible_date(date_str: str) -> Optional[str]:
-    """
-    Parse various date formats and return YYYY-MM-DD format
-    Handles: "2nd October 2020", "7 July 2025", "2020-10-02", "02/10/2020", etc.
-    """
+
     if not date_str or date_str == "null":
         return None
 
-    # Already in correct format
+
     if len(date_str) == 10 and date_str[4] == '-' and date_str[7] == '-':
         try:
             datetime.strptime(date_str, '%Y-%m-%d')
@@ -18,7 +15,7 @@ def parse_flexible_date(date_str: str) -> Optional[str]:
         except ValueError:
             pass
 
-    # Common formats to try
+
     formats = [
         '%Y-%m-%d',  # 2020-10-02
         '%d-%m-%Y',  # 02-10-2020
@@ -34,7 +31,7 @@ def parse_flexible_date(date_str: str) -> Optional[str]:
     # Clean the string
     date_str = date_str.strip()
 
-    # Handle ordinal numbers (1st, 2nd, 3rd, etc.)
+
     import re
     date_str = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_str)
 
@@ -45,7 +42,7 @@ def parse_flexible_date(date_str: str) -> Optional[str]:
         except ValueError:
             continue
 
-    # Try with dateutil if available (more flexible)
+
     try:
         from dateutil import parser
         dt = parser.parse(date_str, dayfirst=True)

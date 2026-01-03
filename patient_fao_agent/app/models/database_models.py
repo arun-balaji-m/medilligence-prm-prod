@@ -2,7 +2,6 @@ from sqlalchemy import Column, BigInteger, String, Date, TIMESTAMP, ForeignKey, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from patient_fao_agent.app.database import Base
-from datetime import datetime
 
 
 class Patient(Base):
@@ -15,8 +14,6 @@ class Patient(Base):
     gender = Column(String)
     mobile_number = Column(String)
     email = Column(String)
-
-    # Relationship
     ai_chat_history = relationship("AIChatHistory", back_populates="patient")
 
 
@@ -28,6 +25,4 @@ class AIChatHistory(Base):
     document = Column(JSONB)
     patient_id = Column(BigInteger, ForeignKey("patient.id"))
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
-
-    # Relationship
     patient = relationship("Patient", back_populates="ai_chat_history")

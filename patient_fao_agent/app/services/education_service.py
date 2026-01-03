@@ -6,7 +6,6 @@ from patient_fao_agent.app.services.patient_service import PatientService
 from fastapi import HTTPException
 from typing import List, Optional
 import uuid
-import json
 
 
 class EducationService:

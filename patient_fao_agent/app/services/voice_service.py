@@ -1,8 +1,6 @@
 import httpx
-import asyncio
 from typing import Optional
 from patient_fao_agent.app.config import settings
-import json
 
 
 class VoiceService:
