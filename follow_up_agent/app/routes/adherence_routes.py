@@ -207,191 +207,294 @@ async def debug_patient_data(mobile_number: str, db: Session = Depends(get_db)):
     }
 
 
+# @router.websocket("/ws/voice")
+# async def voice_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
+#     """WebSocket endpoint for voice interaction"""
+#     await websocket.accept()
+#     session_id = f"voice_{uuid.uuid4()}"
+#
+#     if session_id not in conversation_sessions:
+#         conversation_sessions[session_id] = {
+#             "messages": [],
+#             "patient_verified": False,
+#             "patient_id": None,
+#             "consultation_id": None,
+#             "appointment_id": None,
+#             "doctor_id": None,
+#             "stage": "ask_mobile",
+#             "current_transcript": "",
+#             "is_processing": False
+#         }
+#
+#     session = conversation_sessions[session_id]
+#     ai_service = AIService()
+#     deepgram_ws = None
+#
+#     try:
+#         # Send initial greeting
+#         initial_greeting = "Hello! I'm your follow-up care assistant. Please tell me your registered mobile number."
+#         await websocket.send_json({"type": "response", "text": initial_greeting})
+#
+#         # Generate and send initial audio
+#         audio_bytes = await VoiceService.speak_with_elevenlabs(initial_greeting)
+#         if audio_bytes:
+#             await websocket.send_bytes(audio_bytes)
+#             await websocket.send_json({"type": "audio_complete"})
+#
+#         # Connect to Deepgram
+#         deepgram_url = (
+#             "wss://api.deepgram.com/v1/listen?"
+#             "model=nova-2"
+#             "&encoding=linear16"
+#             "&sample_rate=16000"
+#             "&channels=1"
+#             "&interim_results=true"
+#             "&vad_events=true"
+#         )
+#
+#         deepgram_ws = await websockets.connect(
+#             deepgram_url,
+#             additional_headers={"Authorization": f"Token {settings.DEEPGRAM_API_KEY}"}
+#         )
+#
+#         print(f"Voice session {session_id} connected")
+#         await websocket.send_json({"type": "status", "message": "Listening..."})
+#
+#         async def receive_from_client():
+#             while True:
+#                 try:
+#                     message = await websocket.receive()
+#
+#                     if "bytes" in message:
+#                         audio_size = len(message['bytes'])
+#                         if audio_size > 0:
+#                             await deepgram_ws.send(message["bytes"])
+#                     elif "text" in message:
+#                         data = json.loads(message["text"])
+#                         if data.get("type") == "stop":
+#                             break
+#                 except WebSocketDisconnect:
+#                     break
+#                 except Exception as e:
+#                     print(f"Error receiving from client: {e}")
+#                     break
+#
+#         async def receive_from_deepgram():
+#             while True:
+#                 try:
+#                     response = await deepgram_ws.recv()
+#                     data = json.loads(response)
+#                     msg_type = data.get("type", "")
+#
+#                     if msg_type == "Results":
+#                         channel = data.get("channel", {})
+#                         alternatives = channel.get("alternatives", [])
+#
+#                         if alternatives:
+#                             transcript = alternatives[0].get("transcript", "").strip()
+#                             is_final = data.get("is_final", False)
+#                             speech_final = data.get("speech_final", False)
+#
+#                             if transcript and is_final:
+#                                 session["current_transcript"] += " " + transcript
+#                                 session["current_transcript"] = session["current_transcript"].strip()
+#
+#                                 await websocket.send_json({
+#                                     "type": "interim_transcript",
+#                                     "text": session["current_transcript"]
+#                                 })
+#
+#                             # Only process when speech is truly final AND there's a longer pause
+#                             if speech_final and session["current_transcript"] and not session["is_processing"]:
+#                                 # Wait 1.5 seconds to ensure user is done speaking
+#                                 await asyncio.sleep(1.5)
+#
+#                                 # Check if more speech came in during the wait
+#                                 if session["current_transcript"] and not session["is_processing"]:
+#                                     session["is_processing"] = True
+#                                 user_message = session["current_transcript"]
+#                                 session["current_transcript"] = ""
+#
+#                                 await websocket.send_json({
+#                                     "type": "transcript",
+#                                     "text": user_message
+#                                 })
+#
+#                                 # Process using existing chat logic
+#                                 response_text = await process_voice_message(
+#                                     user_message, session, ai_service, db
+#                                 )
+#
+#                                 await websocket.send_json({
+#                                     "type": "response",
+#                                     "text": response_text
+#                                 })
+#
+#                                 # Generate audio response
+#                                 audio_bytes = await VoiceService.speak_with_elevenlabs(response_text)
+#                                 if audio_bytes:
+#                                     await websocket.send_bytes(audio_bytes)
+#                                     await websocket.send_json({"type": "audio_complete"})
+#
+#                                 await websocket.send_json({
+#                                     "type": "status",
+#                                     "message": "Listening..."
+#                                 })
+#
+#                                 session["is_processing"] = False
+#
+#                     elif msg_type == "UtteranceEnd":
+#                         if session["current_transcript"] and not session["is_processing"]:
+#                             await asyncio.sleep(0.5)
+#                             if session["current_transcript"] and not session["is_processing"]:
+#                                 session["is_processing"] = True
+#                                 user_message = session["current_transcript"]
+#                                 session["current_transcript"] = ""
+#
+#                                 await websocket.send_json({
+#                                     "type": "transcript",
+#                                     "text": user_message
+#                                 })
+#
+#                                 response_text = await process_voice_message(
+#                                     user_message, session, ai_service, db
+#                                 )
+#
+#                                 await websocket.send_json({
+#                                     "type": "response",
+#                                     "text": response_text
+#                                 })
+#
+#                                 audio_bytes = await VoiceService.speak_with_elevenlabs(response_text)
+#                                 if audio_bytes:
+#                                     await websocket.send_bytes(audio_bytes)
+#                                     await websocket.send_json({"type": "audio_complete"})
+#
+#                                 await websocket.send_json({
+#                                     "type": "status",
+#                                     "message": "Listening..."
+#                                 })
+#
+#                                 session["is_processing"] = False
+#
+#                 except websockets.exceptions.ConnectionClosed:
+#                     break
+#                 except Exception as e:
+#                     print(f"Error in Deepgram: {e}")
+#                     break
+#
+#         await asyncio.gather(
+#             receive_from_client(),
+#             receive_from_deepgram()
+#         )
+#
+#     except Exception as e:
+#         print(f"Voice WebSocket error: {e}")
+#         await websocket.send_json({"type": "error", "message": str(e)})
+#     finally:
+#         if deepgram_ws:
+#             await deepgram_ws.close()
+
 @router.websocket("/ws/voice")
 async def voice_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
-    """WebSocket endpoint for voice interaction"""
     await websocket.accept()
     session_id = f"voice_{uuid.uuid4()}"
+    stop_event = asyncio.Event()
 
-    if session_id not in conversation_sessions:
-        conversation_sessions[session_id] = {
-            "messages": [],
-            "patient_verified": False,
-            "patient_id": None,
-            "consultation_id": None,
-            "appointment_id": None,
-            "doctor_id": None,
-            "stage": "ask_mobile",
-            "current_transcript": "",
-            "is_processing": False
-        }
+    session = conversation_sessions.setdefault(session_id, {
+        "messages": [],
+        "patient_verified": False,
+        "patient_id": None,
+        "consultation_id": None,
+        "appointment_id": None,
+        "doctor_id": None,
+        "stage": "ask_mobile",
+        "current_transcript": "",
+        "is_processing": False
+    })
 
-    session = conversation_sessions[session_id]
     ai_service = AIService()
     deepgram_ws = None
 
     try:
-        # Send initial greeting
-        initial_greeting = "Hello! I'm your follow-up care assistant. Please tell me your registered mobile number."
-        await websocket.send_json({"type": "response", "text": initial_greeting})
+        greeting = "Hello! I'm your follow-up care assistant. Please tell me your registered mobile number."
+        await websocket.send_json({"type": "response", "text": greeting})
 
-        # Generate and send initial audio
-        audio_bytes = await VoiceService.speak_with_elevenlabs(initial_greeting)
-        if audio_bytes:
-            await websocket.send_bytes(audio_bytes)
+        audio = await VoiceService.speak_with_elevenlabs(greeting)
+        if audio:
+            await websocket.send_bytes(audio)
             await websocket.send_json({"type": "audio_complete"})
 
-        # Connect to Deepgram
-        deepgram_url = (
-            "wss://api.deepgram.com/v1/listen?"
-            "model=nova-2"
-            "&encoding=linear16"
-            "&sample_rate=16000"
-            "&channels=1"
-            "&interim_results=true"
-            "&vad_events=true"
-        )
+        await websocket.send_json({"type": "status", "message": "Listening..."})
 
         deepgram_ws = await websockets.connect(
-            deepgram_url,
+            "wss://api.deepgram.com/v1/listen?"
+            "model=nova-2&encoding=linear16&sample_rate=16000"
+            "&channels=1&interim_results=true&vad_events=true",
             additional_headers={"Authorization": f"Token {settings.DEEPGRAM_API_KEY}"}
         )
 
-        print(f"Voice session {session_id} connected")
-        await websocket.send_json({"type": "status", "message": "Listening..."})
-
         async def receive_from_client():
-            while True:
-                try:
-                    message = await websocket.receive()
-
-                    if "bytes" in message:
-                        audio_size = len(message['bytes'])
-                        if audio_size > 0:
-                            await deepgram_ws.send(message["bytes"])
-                    elif "text" in message:
-                        data = json.loads(message["text"])
-                        if data.get("type") == "stop":
-                            break
-                except WebSocketDisconnect:
-                    break
-                except Exception as e:
-                    print(f"Error receiving from client: {e}")
-                    break
+            try:
+                while not stop_event.is_set():
+                    msg = await websocket.receive()
+                    if msg.get("bytes"):
+                        await deepgram_ws.send(msg["bytes"])
+            except WebSocketDisconnect:
+                stop_event.set()
+            except Exception:
+                stop_event.set()
 
         async def receive_from_deepgram():
-            while True:
-                try:
-                    response = await deepgram_ws.recv()
-                    data = json.loads(response)
-                    msg_type = data.get("type", "")
+            try:
+                while not stop_event.is_set():
+                    data = json.loads(await deepgram_ws.recv())
+                    if data.get("type") != "Results":
+                        continue
 
-                    if msg_type == "Results":
-                        channel = data.get("channel", {})
-                        alternatives = channel.get("alternatives", [])
+                    alt = data["channel"]["alternatives"][0]
+                    transcript = alt.get("transcript", "").strip()
+                    is_final = data.get("is_final", False)
+                    speech_final = data.get("speech_final", False)
 
-                        if alternatives:
-                            transcript = alternatives[0].get("transcript", "").strip()
-                            is_final = data.get("is_final", False)
-                            speech_final = data.get("speech_final", False)
+                    if transcript and is_final:
+                        session["current_transcript"] += " " + transcript
+                        await websocket.send_json({
+                            "type": "interim_transcript",
+                            "text": session["current_transcript"].strip()
+                        })
 
-                            if transcript and is_final:
-                                session["current_transcript"] += " " + transcript
-                                session["current_transcript"] = session["current_transcript"].strip()
+                    if speech_final and session["current_transcript"] and not session["is_processing"]:
+                        session["is_processing"] = True
+                        user_text = session["current_transcript"].strip()
+                        session["current_transcript"] = ""
 
-                                await websocket.send_json({
-                                    "type": "interim_transcript",
-                                    "text": session["current_transcript"]
-                                })
+                        await websocket.send_json({"type": "transcript", "text": user_text})
 
-                            # Only process when speech is truly final AND there's a longer pause
-                            if speech_final and session["current_transcript"] and not session["is_processing"]:
-                                # Wait 1.5 seconds to ensure user is done speaking
-                                await asyncio.sleep(1.5)
+                        response = await process_voice_message(
+                            user_text, session, ai_service, db
+                        )
 
-                                # Check if more speech came in during the wait
-                                if session["current_transcript"] and not session["is_processing"]:
-                                    session["is_processing"] = True
-                                user_message = session["current_transcript"]
-                                session["current_transcript"] = ""
+                        await websocket.send_json({"type": "response", "text": response})
 
-                                await websocket.send_json({
-                                    "type": "transcript",
-                                    "text": user_message
-                                })
+                        audio = await VoiceService.speak_with_elevenlabs(response)
+                        if audio:
+                            await websocket.send_bytes(audio)
+                            await websocket.send_json({"type": "audio_complete"})
 
-                                # Process using existing chat logic
-                                response_text = await process_voice_message(
-                                    user_message, session, ai_service, db
-                                )
+                        await websocket.send_json({"type": "status", "message": "Listening..."})
+                        session["is_processing"] = False
 
-                                await websocket.send_json({
-                                    "type": "response",
-                                    "text": response_text
-                                })
-
-                                # Generate audio response
-                                audio_bytes = await VoiceService.speak_with_elevenlabs(response_text)
-                                if audio_bytes:
-                                    await websocket.send_bytes(audio_bytes)
-                                    await websocket.send_json({"type": "audio_complete"})
-
-                                await websocket.send_json({
-                                    "type": "status",
-                                    "message": "Listening..."
-                                })
-
-                                session["is_processing"] = False
-
-                    elif msg_type == "UtteranceEnd":
-                        if session["current_transcript"] and not session["is_processing"]:
-                            await asyncio.sleep(0.5)
-                            if session["current_transcript"] and not session["is_processing"]:
-                                session["is_processing"] = True
-                                user_message = session["current_transcript"]
-                                session["current_transcript"] = ""
-
-                                await websocket.send_json({
-                                    "type": "transcript",
-                                    "text": user_message
-                                })
-
-                                response_text = await process_voice_message(
-                                    user_message, session, ai_service, db
-                                )
-
-                                await websocket.send_json({
-                                    "type": "response",
-                                    "text": response_text
-                                })
-
-                                audio_bytes = await VoiceService.speak_with_elevenlabs(response_text)
-                                if audio_bytes:
-                                    await websocket.send_bytes(audio_bytes)
-                                    await websocket.send_json({"type": "audio_complete"})
-
-                                await websocket.send_json({
-                                    "type": "status",
-                                    "message": "Listening..."
-                                })
-
-                                session["is_processing"] = False
-
-                except websockets.exceptions.ConnectionClosed:
-                    break
-                except Exception as e:
-                    print(f"Error in Deepgram: {e}")
-                    break
+            except Exception:
+                stop_event.set()
 
         await asyncio.gather(
             receive_from_client(),
             receive_from_deepgram()
         )
 
-    except Exception as e:
-        print(f"Voice WebSocket error: {e}")
-        await websocket.send_json({"type": "error", "message": str(e)})
     finally:
+        stop_event.set()
         if deepgram_ws:
             await deepgram_ws.close()
 

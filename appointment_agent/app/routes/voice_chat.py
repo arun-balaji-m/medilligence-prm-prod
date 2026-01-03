@@ -245,6 +245,103 @@ async def process_transcript_with_ai(transcript: str, session_id: str, db: Sessi
         })
 
 
+# @router.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     session_id = f"voice_session_{id(websocket)}"
+#
+#     db = next(get_db())
+#     voice_handler = VoiceHandler()
+#     deepgram_ws = None
+#
+#     try:
+#         # Welcome
+#         await websocket.send_json({"type": "status", "message": "Connected"})
+#         await websocket.send_json({"type": "response", "text": WELCOME_MESSAGE})
+#
+#         audio = await voice_handler.text_to_speech(WELCOME_MESSAGE)
+#         if audio:
+#             await websocket.send_bytes(audio)
+#             await websocket.send_json({"type": "audio_complete"})
+#
+#         await websocket.send_json({"type": "status", "message": "Listening..."})
+#
+#         # Deepgram connection
+#         deepgram_url = (
+#             "wss://api.deepgram.com/v1/listen?"
+#             "model=nova-2"
+#             "&encoding=linear16"
+#             "&sample_rate=16000"
+#             "&channels=1"
+#             "&interim_results=true"
+#             "&vad_events=true"
+#         )
+#
+#         deepgram_ws = await websockets.connect(
+#             deepgram_url,
+#             additional_headers={"Authorization": f"Token {DEEPGRAM_API_KEY}"}
+#         )
+#
+#         async def receive_from_client():
+#             while True:
+#                 try:
+#                     message = await websocket.receive()
+#                     if "bytes" in message and message["bytes"]:
+#                         await deepgram_ws.send(message["bytes"])
+#                 except WebSocketDisconnect:
+#                     break
+#
+#         async def receive_from_deepgram():
+#             while True:
+#                 try:
+#                     data = json.loads(await deepgram_ws.recv())
+#                     msg_type = data.get("type")
+#
+#                     if msg_type == "Results":
+#                         alt = data["channel"]["alternatives"][0]
+#                         transcript = alt.get("transcript", "").strip()
+#                         is_final = data.get("is_final", False)
+#                         speech_final = data.get("speech_final", False)
+#
+#                         if transcript and is_final:
+#                             voice_handler.current_transcript += " " + transcript
+#                             voice_handler.current_transcript = voice_handler.current_transcript.strip()
+#
+#                             await websocket.send_json({
+#                                 "type": "interim_transcript",
+#                                 "text": voice_handler.current_transcript
+#                             })
+#
+#                         if speech_final and voice_handler.current_transcript and not voice_handler.is_processing:
+#                             await process_voice_input(
+#                                 websocket,
+#                                 voice_handler,
+#                                 session_id,
+#                                 db
+#                             )
+#
+#                     elif msg_type == "UtteranceEnd":
+#                         if voice_handler.current_transcript and not voice_handler.is_processing:
+#                             await process_voice_input(
+#                                 websocket,
+#                                 voice_handler,
+#                                 session_id,
+#                                 db
+#                             )
+#
+#                 except Exception:
+#                     break
+#
+#         await asyncio.gather(
+#             receive_from_client(),
+#             receive_from_deepgram()
+#         )
+#
+#     finally:
+#         if deepgram_ws:
+#             await deepgram_ws.close()
+#         db.close()
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -253,9 +350,10 @@ async def websocket_endpoint(websocket: WebSocket):
     db = next(get_db())
     voice_handler = VoiceHandler()
     deepgram_ws = None
+    stop_event = asyncio.Event()
 
     try:
-        # Welcome
+        # ---- Welcome ----
         await websocket.send_json({"type": "status", "message": "Connected"})
         await websocket.send_json({"type": "response", "text": WELCOME_MESSAGE})
 
@@ -266,34 +364,38 @@ async def websocket_endpoint(websocket: WebSocket):
 
         await websocket.send_json({"type": "status", "message": "Listening..."})
 
-        # Deepgram connection
+        # ---- Deepgram ----
         deepgram_url = (
             "wss://api.deepgram.com/v1/listen?"
-            "model=nova-2"
-            "&encoding=linear16"
-            "&sample_rate=16000"
-            "&channels=1"
-            "&interim_results=true"
-            "&vad_events=true"
+            "model=nova-2&encoding=linear16&sample_rate=16000"
+            "&channels=1&interim_results=true&vad_events=true"
         )
 
         deepgram_ws = await websockets.connect(
             deepgram_url,
-            additional_headers={"Authorization": f"Token {DEEPGRAM_API_KEY}"}
+            additional_headers={"Authorization": f"Token {DEEPGRAM_API_KEY}"},
+            ping_interval=5,
+            ping_timeout=10
         )
 
         async def receive_from_client():
-            while True:
-                try:
+            try:
+                while not stop_event.is_set():
                     message = await websocket.receive()
-                    if "bytes" in message and message["bytes"]:
+                    if message.get("type") == "websocket.disconnect":
+                        stop_event.set()
+                        break
+
+                    if message.get("bytes"):
                         await deepgram_ws.send(message["bytes"])
-                except WebSocketDisconnect:
-                    break
+            except WebSocketDisconnect:
+                stop_event.set()
+            except Exception:
+                stop_event.set()
 
         async def receive_from_deepgram():
-            while True:
-                try:
+            try:
+                while not stop_event.is_set():
                     data = json.loads(await deepgram_ws.recv())
                     msg_type = data.get("type")
 
@@ -328,9 +430,8 @@ async def websocket_endpoint(websocket: WebSocket):
                                 session_id,
                                 db
                             )
-
-                except Exception:
-                    break
+            except Exception:
+                stop_event.set()
 
         await asyncio.gather(
             receive_from_client(),
@@ -338,42 +439,129 @@ async def websocket_endpoint(websocket: WebSocket):
         )
 
     finally:
+        stop_event.set()
         if deepgram_ws:
             await deepgram_ws.close()
         db.close()
 
 
+# async def process_voice_input(websocket, voice_handler, session_id, db):
+#     voice_handler.is_processing = True
+#     transcript = voice_handler.current_transcript
+#     voice_handler.current_transcript = ""
+#
+#     await websocket.send_json({"type": "transcript", "text": transcript})
+#     await websocket.send_json({"type": "status", "message": "Thinking..."})
+#
+#     # 🔒 EXISTING appointment AI logic — untouched
+#     result = process_chat_message(transcript, session_id)
+#     while result["type"] == "function_call":
+#         function_result = execute_function(
+#             result["function_name"],
+#             result["function_args"],
+#             db
+#         )
+#         result = add_function_result(
+#             session_id,
+#             result["function_name"],
+#             function_result
+#         )
+#
+#     response_text = result["content"]
+#
+#     await websocket.send_json({"type": "response", "text": response_text})
+#     await websocket.send_json({"type": "status", "message": "Speaking..."})
+#
+#     audio = await voice_handler.text_to_speech(response_text)
+#     if audio:
+#         await websocket.send_bytes(audio)
+#         await websocket.send_json({"type": "audio_complete"})
+#
+#     await websocket.send_json({"type": "status", "message": "Listening..."})
+#     voice_handler.is_processing = False
+
 async def process_voice_input(websocket, voice_handler, session_id, db):
+    # Prevent parallel processing
+    if voice_handler.is_processing:
+        return
+
     voice_handler.is_processing = True
-    transcript = voice_handler.current_transcript
-    voice_handler.current_transcript = ""
 
-    await websocket.send_json({"type": "transcript", "text": transcript})
-    await websocket.send_json({"type": "status", "message": "Thinking..."})
+    try:
+        transcript = voice_handler.current_transcript.strip()
+        voice_handler.current_transcript = ""
 
-    # 🔒 EXISTING appointment AI logic — untouched
-    result = process_chat_message(transcript, session_id)
-    while result["type"] == "function_call":
-        function_result = execute_function(
-            result["function_name"],
-            result["function_args"],
-            db
-        )
-        result = add_function_result(
-            session_id,
-            result["function_name"],
-            function_result
-        )
+        if not transcript:
+            return
 
-    response_text = result["content"]
+        # Send transcript to frontend
+        await websocket.send_json({
+            "type": "transcript",
+            "text": transcript
+        })
 
-    await websocket.send_json({"type": "response", "text": response_text})
-    await websocket.send_json({"type": "status", "message": "Speaking..."})
+        await websocket.send_json({
+            "type": "status",
+            "message": "Thinking..."
+        })
 
-    audio = await voice_handler.text_to_speech(response_text)
-    if audio:
-        await websocket.send_bytes(audio)
-        await websocket.send_json({"type": "audio_complete"})
+        # 🔒 EXISTING appointment AI logic — untouched
+        result = process_chat_message(transcript, session_id)
 
-    await websocket.send_json({"type": "status", "message": "Listening..."})
-    voice_handler.is_processing = False
+        while result["type"] == "function_call":
+            function_result = execute_function(
+                result["function_name"],
+                result["function_args"],
+                db
+            )
+            result = add_function_result(
+                session_id,
+                result["function_name"],
+                function_result
+            )
+
+        response_text = result.get("content", "").strip()
+
+        if not response_text:
+            return
+
+        await websocket.send_json({
+            "type": "response",
+            "text": response_text
+        })
+
+        await websocket.send_json({
+            "type": "status",
+            "message": "Speaking..."
+        })
+
+        # 🎙️ Text-to-Speech
+        audio = await voice_handler.text_to_speech(response_text)
+
+        if audio:
+            await websocket.send_bytes(audio)
+            await websocket.send_json({
+                "type": "audio_complete"
+            })
+
+        await websocket.send_json({
+            "type": "status",
+            "message": "Listening..."
+        })
+
+    except Exception as e:
+        # Log but do NOT crash websocket loop
+        print("❌ Error in process_voice_input:", str(e))
+
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Voice processing failed"
+            })
+        except:
+            pass  # WebSocket already closed
+
+    finally:
+        # ✅ ALWAYS reset this
+        voice_handler.is_processing = False
+
