@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Business Engine</title>
+    <style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    :root {
+        --primary-blue: #2F66E0;
+        --primary-blue-dark: #2457C5;
+        --bg-light: #F4F7FB;
+        --text-dark: #1F2937;
+        --border-light: #E5E7EB;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg-light);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.08);
+        max-width: 1200px;
+        width: 100%;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .header {
+        background: var(--primary-blue);
+        color: white;
+        padding: 25px 30px;
+    }
+
+    .header h1 {
+        font-size: 26px;
+        margin-bottom: 4px;
+        font-weight: 600;
+    }
+
+    .header p {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .chat-area {
+        flex: 1;
+        padding: 30px;
+        overflow-y: auto;
+        background: var(--bg-light);
+    }
+
+    .message {
+        margin-bottom: 18px;
+        animation: fadeIn 0.25s ease-in;
+    }
+
+    .message.user {
+        text-align: right;
+    }
+
+    .message-content {
+        display: inline-block;
+        padding: 14px 18px;
+        border-radius: 14px;
+        max-width: 72%;
+        word-wrap: break-word;
+        font-size: 14px;
+    }
+
+    .message.user .message-content {
+        background: var(--primary-blue);
+        color: white;
+    }
+
+    .message.assistant .message-content {
+        background: white;
+        color: var(--text-dark);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+
+    .table-container {
+        overflow-x: auto;
+        margin: 15px 0;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        background: white;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th {
+        background: var(--primary-blue);
+        color: white;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+    }
+
+    td {
+        padding: 12px;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 13px;
+    }
+
+    tr:hover {
+        background: #F9FAFB;
+    }
+
+    .stats {
+        display: flex;
+        gap: 15px;
+        margin: 12px 0;
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        background: #EEF3FF;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    .stat-label {
+        color: #475569;
+        font-weight: 600;
+    }
+
+    .stat-value {
+        color: var(--primary-blue);
+        font-weight: 700;
+    }
+
+    .export-btn {
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        margin-top: 10px;
+        transition: background 0.2s ease;
+    }
+
+    .export-btn:hover {
+        background: var(--primary-blue-dark);
+    }
+
+    .error-message {
+        background: #FEE2E2;
+        color: #991B1B;
+        padding: 14px;
+        border-radius: 10px;
+        border-left: 4px solid #DC2626;
+        font-size: 14px;
+    }
+
+    .input-area {
+        padding: 18px 28px;
+        background: white;
+        border-top: 1px solid var(--border-light);
+    }
+
+    .input-container {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+    }
+
+    .input-container input {
+        flex: 1;
+        padding: 14px 18px;
+        border: 1.8px solid var(--border-light);
+        border-radius: 24px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .input-container input:focus {
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 3px rgba(47,102,224,0.12);
+    }
+
+    .input-container button {
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        padding: 14px 26px;
+        border-radius: 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .input-container button:hover {
+        background: var(--primary-blue-dark);
+    }
+
+    .example-query {
+        background: #EEF3FF;
+        color: var(--primary-blue);
+        padding: 7px 14px;
+        border-radius: 14px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .example-query:hover {
+        background: var(--primary-blue);
+        color: white;
+    }
+
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--primary-blue);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--primary-blue-dark);
+    }
+</style>
+
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Quick Business Engine</h1>
+            <p>Ask questions about your data in plain English</p>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="message assistant">
+                <div class="message-content">
+                    <p><strong>Welcome!</strong></p>
+                    <p>I can help you query your database using natural language. Just ask me anything!</p>
+                    <div class="example-queries">
+                        <div class="example-query" onclick="setQuery('Show all patients born after 1990')">
+                            Show all patients born after 1990
+                        </div>
+                        <div class="example-query" onclick="setQuery('List patients with allergies')">
+                            List patients with allergies
+                        </div>
+                        <div class="example-query" onclick="setQuery('Find patients in New York')">
+                            Find patients in New York
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-container">
+                <input
+                    type="text"
+                    id="queryInput"
+                    placeholder="Ask a question about your data..."
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button id="sendBtn" onclick="sendQuery()">
+                    <span id="btnText">Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let currentQueryResponse = null;
+    let lastSQLQuery = null;
+
+    function setQuery(query) {
+        document.getElementById('queryInput').value = query;
+        document.getElementById('queryInput').focus();
+    }
+
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            sendQuery();
+        }
+    }
+
+    async function sendQuery() {
+        const input = document.getElementById('queryInput');
+        const query = input.value.trim();
+
+        if (!query) return;
+
+        // Disable input
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true;
+        document.getElementById('btnText').innerHTML = '<span class="loading"></span>';
+
+        // Add user message
+        addMessage(query, 'user');
+        input.value = '';
+
+        try {
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query })
+            });
+
+            const data = await response.json();
+            currentQueryResponse = data;
+            lastSQLQuery = data.sql_query;
+            console.log("Saved SQL for export:", lastSQLQuery);
+
+            if (data.success) {
+                displaySuccessResponse(data);
+            } else {
+                displayErrorResponse(data.error);
+            }
+        } catch (error) {
+            displayErrorResponse('Failed to process query: ' + error.message);
+        } finally {
+            sendBtn.disabled = false;
+            document.getElementById('btnText').textContent = 'Send';
+        }
+    }
+
+    function addMessage(content, type) {
+        const chatArea = document.getElementById('chatArea');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
+        chatArea.appendChild(messageDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function displaySuccessResponse(data) {
+        const chatArea = document.getElementById('chatArea');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant';
+
+        let html = '<div class="message-content">';
+        html += '<p><strong>Query Executed Successfully</strong></p>';
+
+        // Stats
+        html += '<div class="stats">';
+        html += `<div class="stat-item"><span class="stat-label">Total Rows:</span> <span class="stat-value">${data.total_rows}</span></div>`;
+        html += `<div class="stat-item"><span class="stat-label">Execution Time:</span> <span class="stat-value">${data.execution_time}s</span></div>`;
+        html += '</div>';
+
+        // Results table
+        if (data.preview_data && data.preview_data.length > 0) {
+            html += '<div class="table-container">';
+            html += '<table>';
+            html += '<thead><tr>';
+            data.columns.forEach(col => {
+                html += `<th>${escapeHtml(col)}</th>`;
+            });
+            html += '</tr></thead>';
+            html += '<tbody>';
+            data.preview_data.forEach(row => {
+                html += '<tr>';
+                data.columns.forEach(col => {
+                    const value = row[col];
+                    const displayValue = typeof value === 'object' ? JSON.stringify(value) : value;
+                    html += `<td>${escapeHtml(String(displayValue || ''))}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+
+            html += `<p style="margin-top: 10px; font-size: 13px; color: #718096;">Showing ${data.preview_data.length} of ${data.total_rows} rows</p>`;
+
+            // Export button (NO inline JS)
+            if (data.total_rows > 0) {
+                html += `<button class="export-btn" id="exportBtn">Export All to CSV</button>`;
+            }
+        } else {
+            html += '<p>No results found.</p>';
+        }
+
+        html += '</div>';
+        messageDiv.innerHTML = html;
+        chatArea.appendChild(messageDiv);
+
+        // Attach export handler safely
+        setTimeout(() => {
+            const btn = document.getElementById("exportBtn");
+            if (!btn) return;
+
+            btn.addEventListener("click", () => {
+                console.log("Export clicked");
+                if (!lastSQLQuery) {
+                    alert("No query available to export.");
+                    return;
+                }
+                exportToCSV(lastSQLQuery);
+            });
+        }, 0);
+
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function displayErrorResponse(error) {
+        const chatArea = document.getElementById('chatArea');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant';
+        messageDiv.innerHTML = `
+            <div class="message-content">
+                <div class="error-message">
+                    <strong>Error:</strong><br>
+                    ${escapeHtml(error)}
+                </div>
+            </div>
+        `;
+        chatArea.appendChild(messageDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    async function exportToCSV(sqlQuery) {
+        if (!sqlQuery) {
+            alert('No query to export');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/export-csv', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sql_query: sqlQuery })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'query_results.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                const chatArea = document.getElementById('chatArea');
+                const successMsg = document.createElement('div');
+                successMsg.className = 'message assistant';
+                successMsg.innerHTML = '<div class="message-content">CSV exported successfully!</div>';
+                chatArea.appendChild(successMsg);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Export failed');
+            }
+        } catch (error) {
+            displayErrorResponse('Failed to export CSV: ' + error.message);
+        }
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('SQL query copied to clipboard!');
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+
+</body>
+</html>

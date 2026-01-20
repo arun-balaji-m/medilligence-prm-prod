@@ -26,6 +26,7 @@ from follow_up_agent.app.routes import router as followup_router
 from patient_fao_agent.app.routes import education_routes, voice_routes as faq_voice
 from patient_referral_agent.app.routes.referral_routes import router as referral_router
 from pre_assessment_agent.app.routes import assessment_routes
+from quick_business_engine.app.routes import router as quick_business_router
 
 
 app.include_router(appointment.router, prefix="/appointment", tags=["appointment"])
@@ -44,6 +45,8 @@ app.include_router(referral_router, prefix="/referral", tags=["referral"])
 
 
 app.include_router(assessment_routes.router, prefix="/assessment", tags=["assessment"])
+
+app.include_router(quick_business_router, prefix="/quick-business", tags=["quick-business"])
 
 
 appointment_static = os.path.join(os.path.dirname(__file__), "appointment_agent", "app", "static")
@@ -66,6 +69,9 @@ assessment_static = os.path.join(os.path.dirname(__file__), "pre_assessment_agen
 if os.path.exists(assessment_static):
     app.mount("/assessment/static", StaticFiles(directory=assessment_static), name="assessment-static")
 
+quick_business_static = os.path.join(os.path.dirname(__file__), "quick_business_engine", "app", "static")
+if os.path.exists(quick_business_static):
+    app.mount("/quick-business/static",StaticFiles(directory=quick_business_static), name="quick-business-static")
 
 from fastapi.responses import FileResponse
 
@@ -108,6 +114,11 @@ async def assessment_root():
 @app.get("/assessment/chat")
 async def assessment_chat():
     return FileResponse(os.path.join(assessment_static, "chat.html"))
+
+@app.get("/quick-business")
+@app.get("/quick-business/chat")
+async def quick_business_chat():
+    return FileResponse(os.path.join(quick_business_static, "chat.html"))
 
 
 @app.get("/")
@@ -238,6 +249,12 @@ async def root():
                     <h3>Pre-assessment Agent</h3>
                     <p>Collect patient medical information before appointments</p>
                 </a>
+                
+                <a href="/quick-business/chat" class="agent-card">
+                    <div class="icon">📝</div>
+                    <h3>Quick Business Agent</h3>
+                    <p>Ask questions about your data in plain English</p>
+                </a>
             </div>
 
             <div class="health-status">
@@ -261,7 +278,8 @@ async def health_check():
             "followup": "mounted at /followup",
             "faq": "mounted at /faq",
             "referral": "mounted at /referral",
-            "assessment": "mounted at /assessment"
+            "assessment": "mounted at /assessment",
+            "quick-business": "mounted at /quick-business"
         }
     }
 
@@ -300,24 +318,31 @@ async def list_agents():
                 "path": "/assessment",
                 "description": "Pre-appointment patient information collection",
                 "endpoints": ["/assessment/", "/assessment/health"]
+            },
+            {
+                "name": "Quick Business Agent",
+                "path": "/quick-business",
+                "description": "Ask questions about your data in plain English",
+                "endpoints": ["/quick-business/", "/quick-business/health"]
             }
         ]
     }
 
 
-# if __name__ == "__main__":
-#     import uvicorn
-#
-#     print("=" * 70)
-#     print("Starting MediLligence AI Agents Gateway")
-#     print("=" * 70)
-#     print("\nGateway URL: http://localhost:8000")
-#     print("\nAgent Routes:")
-#     print("  • Appointment Agent: http://localhost:8000/appointment")
-#     print("  • Follow-up Agent:   http://localhost:8000/followup")
-#     print("  • FAQ Agent:         http://localhost:8000/faq")
-#     print("  • Referral Agent:    http://localhost:8000/referral")
-#     print("  • Assessment Agent:  http://localhost:8000/assessment")
-#     print("\n" + "=" * 70 + "\n")
-#
-#     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+if __name__ == "__main__":
+    import uvicorn
+
+    print("=" * 70)
+    print("Starting MediLligence AI Agents Gateway")
+    print("=" * 70)
+    print("\nGateway URL: http://localhost:8000")
+    print("\nAgent Routes:")
+    print("  • Appointment Agent: http://localhost:8000/appointment")
+    print("  • Follow-up Agent:   http://localhost:8000/followup")
+    print("  • FAQ Agent:         http://localhost:8000/faq")
+    print("  • Referral Agent:    http://localhost:8000/referral")
+    print("  • Assessment Agent:  http://localhost:8000/assessment")
+    print("  • Quick Business Agent:  http://localhost:8000/quick-business")
+    print("\n" + "=" * 70 + "\n")
+
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
