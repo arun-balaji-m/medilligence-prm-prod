@@ -38,5 +38,5 @@ class TableSearchResult(BaseModel):
 
     table_name: str
     relevance_score: float
-    schema: str
+    table_schema: str
     source: str  # "semantic" or "llama"

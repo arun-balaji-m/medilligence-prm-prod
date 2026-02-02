@@ -308,7 +308,7 @@ class AIService:
                 search_results.append(TableSearchResult(
                     table_name=metadata.get('table_name', 'unknown'),
                     relevance_score=relevance_score,
-                    schema=doc,
+                    table_schema=doc,
                     source="semantic"
                 ))
 
@@ -367,7 +367,7 @@ class AIService:
                     llama_results.append(TableSearchResult(
                         table_name=table['table_name'],
                         relevance_score=table.get('relevance_score', 0.5),
-                        schema=schema,
+                        table_schema=schema,
                         source="llama"
                     ))
 
@@ -389,7 +389,7 @@ class AIService:
         for result in semantic_results:
             if result.table_name not in table_scores:
                 table_scores[result.table_name] = {
-                    'schema': result.schema,
+                    'schema': result.table_schema,
                     'score': 0,
                     'sources': []
                 }
@@ -400,7 +400,7 @@ class AIService:
         for result in llama_results:
             if result.table_name not in table_scores:
                 table_scores[result.table_name] = {
-                    'schema': result.schema,
+                    'schema': result.table_schema,
                     'score': 0,
                     'sources': []
                 }
