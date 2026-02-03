@@ -43,4 +43,5 @@ EXPOSE 10000
 # ----------------------------
 # Start API Gateway (QUBE)
 # ----------------------------
-CMD ["gunicorn", "main_qube:app", "-k", "uvicorn.workers.UvicornWorker", "--workers", "1", "--threads", "2", "--bind", "0.0.0.0:10000"]
+#CMD ["gunicorn", "main_qube:app", "-k", "uvicorn.workers.UvicornWorker", "--workers", "1", "--threads", "2", "--bind", "0.0.0.0:10000"]
+CMD ["sh", "-c", "echo \"Binding to port $PORT\" && gunicorn main_qube:app -k uvicorn.workers.UvicornWorker --workers 1 --threads 2 --bind 0.0.0.0:$PORT"]
